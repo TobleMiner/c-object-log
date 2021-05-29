@@ -7,6 +7,8 @@
 
 uint8_t logbuf[1235];
 
+#define ARRAY_SIZE(arr) (sizeof(arr)/sizeof(*arr))
+
 static void hexdump(const void *data, size_t len) {
 	const uint8_t *data8 = data;
 	size_t full_len = len;
@@ -54,11 +56,26 @@ int main() {
 	objectlog_write_string(&log, "This is a very long test string. It is in fact so long that it won't fit within a single fragment. So how was your day? Mine was great! I got to play around with mind-numbing amounts of pointers on string fragments");
 
 	for (int i = 0; i < 100; i++) {
+		int j;
+		size_t len, offset = 0;
 		char strbuf[300];
 		const char *suffix = "This is a very long test string. It is in fact so long that it won't fit within a single fragment. So how was your day? Mine was great! I got to play around with mind-numbing amounts of pointers on string fragments";
+		scatter_object_t scatter_list[20];
 
-		snprintf(strbuf, sizeof(strbuf), "This is test string %d %.*s", i, rand() % strlen(suffix), suffix);
-		objectlog_write_string(&log, strbuf);
+		len = snprintf(strbuf, sizeof(strbuf), "This is test string %d %.*s", i, rand() % strlen(suffix), suffix);
+
+		for (j = 0; j < ARRAY_SIZE(scatter_list) - 2 && offset < len; j++) {
+			size_t left = len - offset;
+			size_t entry_len = rand() % left + 1;
+			scatter_list[j].ptr = strbuf + offset;
+			scatter_list[j].len = entry_len;
+			printf("Scatter %d, len %zu\n", j, entry_len);
+			offset += entry_len;
+		}
+		scatter_list[j].ptr = strbuf + offset;
+		scatter_list[j].len = len - offset;
+		scatter_list[j + 1].len = 0;
+		objectlog_write_scattered_object(&log, scatter_list);
 	}
 
 	printf("Stored strings: %u\n", log.num_entries);
