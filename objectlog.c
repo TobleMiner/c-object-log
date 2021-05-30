@@ -9,12 +9,16 @@
 
 #define DIV_ROUND_UP(x, y) (((x) + ((y) - 1)) / (y))
 
-static uint16_t get_next_entry(objectlog_t *log, uint16_t offset) {
+static void get_next_entry(objectlog_t *log, objectlog_ring_ptr_t **offset) {
 	uint8_t fragment_hdr;
+	ringbuffer_t ring;
+	const scatter_object_t *storage = (*offset)->storage;
+	const scatter_object_t *storage_start = storage;
 
-	log->ring.read_ptr = offset;
+	ring_init(&ring, (*offset)->storage->ptr, (*offset)->storage->len);
+	ring.read_ptr = (*offset)->ptr;
 	do {
-		uint16_t hdr_pos = log->ring.read_ptr;
+		uint16_t hdr_pos = ring.read_ptr;
 
 		fragment_hdr = ringbuffer_read_one(&log->ring);
 		ringbuffer_advance_read(&log->ring, FRAGMENT_LEN(fragment_hdr));
@@ -23,9 +27,9 @@ static uint16_t get_next_entry(objectlog_t *log, uint16_t offset) {
 		 * whether we have wrapped across @offset and terminate if
 		 * we did
 		 */
-		if ((hdr_pos < offset && log->ring.read_ptr >= offset) ||
-		    (hdr_pos > offset && log->ring.read_ptr >= offset &&
-		     log->ring.read_ptr < hdr_pos)) {
+		if ((hdr_pos < offset && ring.read_ptr >= offset) ||
+		    (hdr_pos > offset && ring.read_ptr >= offset &&
+		     ring.read_ptr < hdr_pos) && storage == storage_start) {
 			return log->ptr_first;
 		}
 	} while (!(fragment_hdr & FRAGMENT_FINAL));
@@ -64,11 +68,52 @@ static void objectlog_write_fragment_data(objectlog_t *log, const void *data, ui
 	ringbuffer_write(&log->ring, data, len);
 }
 
-void objectlog_init(objectlog_t *log, void *storage, uint16_t size) {
-	ringbuffer_init(&log->ring, storage, size);
-	log->ptr_first = 0;
-	log->ptr_last = 0;
+int objectlog_init_fragmented(objectlog_t *log, const scatter_object_t *storage) {
+	const scatter_object_t *sc_entry = storage;
+	const scatter_object_t *sc_max_entry_idx = 0;
+	scatter_object_t *sc_list_copy;
+	unsigned int num_storage_area = 0;
+	uint16_t storage_size;
+
+	while (sc_entry->len) {
+		if (sc_entry->len > storage[sc_max_entry_idx].len) {
+			sc_max_entry_idx = num_storage_area;
+		}
+		num_storage_area++;
+		sc_entry++;
+	}
+	if (!num_storage_area) {
+		return -1;
+	}
+
+	log->num_storage = mum_storage_area;
+	storage_size = nun_storage_area * sizeof(scatter_object_t);
+
+	if (storage[sc_max_entry_idx].len < storage_size) {
+		return -1;
+	}
+
+	sc_list_copy = storage[sc_max_entry_idx].ptr;
+	memcpy(sc_list_copy, storage, storage_size);
+	((const uint8_t*)sc_list_copy[sc_max_entry_idx].ptr) += storage_size;
+	sc_list_copy[sc_max_entry_idx].len -= storage_size;
+	log->storage = sc_list_copy;
+	log->ptr_first.storage = sc_list_copy;
+	log->ptr_first.ptr = 0;
+	log->ptr_last.storage = sc_list_copy;
+	log->ptr_last.ptr = 0;
 	log->num_entries = 0;
+	ringbuffer_init(&log->ring, log->storage->ptr, log->storage->len);
+	return 0;
+}
+
+int objectlog_init(objectlog_t *log, void *storage, uint16_t size) {
+	scatter_object_t scatter_storage[] = {
+		{ .ptr = storage, .len = size },
+		{ .len = 0 },
+	};
+
+	return objectlog_init_fragmented(log, scatter_storage);
 }
 
 /**
