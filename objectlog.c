@@ -72,7 +72,7 @@ void objectlog_init(objectlog_t *log, void *storage, uint16_t size) {
 }
 
 /**
- * Write object from non-contuguous memory area to object log
+ * Write object from non-contiguous memory area to object log
  * Oftentimes data that needs to be stored is not available from a contiguous
  * memory region. This method accepts a list of (pointer, length) pairs and
  * constructs the object to be stored by iterating over it. In each iteration
@@ -190,7 +190,7 @@ uint16_t objectlog_write_string(objectlog_t *log, const char *str) {
 }
 
 /**
- * Obtain interator for object at index @object_idx
+ * Obtain iterator for object at index @object_idx
  * Negative indices count from last to first string.
  *
  * @returns: non-negative iterator value on success, -1 on failure
