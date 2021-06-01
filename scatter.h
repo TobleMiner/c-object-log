@@ -1,7 +1,16 @@
 #include <stdint.h>
 
 typedef struct {
-	const void *ptr;
+	void *ptr;
 	uint16_t len;
 } scatter_object_t;
 
+static inline uint16_t scatter_list_size(scatter_object_t *sc_list) {
+	uint16_t len = 0;
+
+	while(sc_list->len) {
+		len += sc_list++->len;
+	}
+
+	return len;
+}
