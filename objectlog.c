@@ -11,12 +11,9 @@
 
 static void get_next_entry(objectlog_t *log, multiring_ptr_t *offset) {
 	uint8_t fragment_hdr;
-	multiring_ptr_t hdr_pos;
 
 	log->multiring.ptr_read = *offset;
 	do {
-		multiring_ptr_t hdr_pos = log->multiring.ptr_read;
-
 		fragment_hdr = multiring_read_one(&log->multiring);
 		multiring_advance_read(&log->multiring, FRAGMENT_LEN(fragment_hdr));
 		/*
@@ -27,38 +24,18 @@ static void get_next_entry(objectlog_t *log, multiring_ptr_t *offset) {
 		 */
 	} while (!(fragment_hdr & FRAGMENT_FINAL) && FRAGMENT_LEN(fragment_hdr));
 
-	*offset = hdr_pos;
+	*offset = log->multiring.ptr_read;
 }
 
 static uint16_t objectlog_space_between(objectlog_t *log,
 					multiring_ptr_t *first,
 					multiring_ptr_t *second) {
-	uint16_t len;
-	multiring_ptr_t *ptr = first;
-
-	/* Simple cases: first and second are from the same scatter list entry */
-	if (first->storage == second->storage) {
-		if (first->offset < second->offset) {
-			return second->offset - first->offset;
-		}
-		return log->multiring.size - (first->offset - second->offset);
-	}
-
-	/* Complex case: first and second in different scatter list entries */
-	len = first->storage->len - first->offset;
-	do {
-		multiring_next_ring(&log->multiring, ptr);
-		len += ptr->storage->len;
-	} while (ptr->storage != second->storage);
-	len -= (second->storage->len - second->offset);
-
-	return len;
+	return multiring_byte_delta(&log->multiring, first, second);
 }
 
-static uint16_t drop_first_entry(objectlog_t *log) {
+static void drop_first_entry(objectlog_t *log) {
 	get_next_entry(log, &log->ptr_first);
 	log->num_entries--;
-	return log->ptr_first;
 }
 
 static uint16_t objectlog_free_space(objectlog_t *log, multiring_ptr_t *from) {
@@ -85,7 +62,7 @@ int objectlog_init_fragmented(objectlog_t *log, const scatter_object_t *storage)
 	if (err) {
 		return err;
 	}
-	multiring_memset(&log->multiring, 0, &log->multiring.size);
+	multiring_memset(&log->multiring, 0, log->multiring.size);
 
 	log->ptr_first = log->multiring.ptr_read;
 	log->ptr_last = log->multiring.ptr_read;
@@ -140,11 +117,11 @@ uint16_t objectlog_write_scattered_object(objectlog_t *log, const scatter_object
 
 	/* Get number of bytes not in use at the moment */
 	get_next_entry(log, &log_end);
-	free_space = objectlog_free_space(log, log_end);
+	free_space = objectlog_free_space(log, &log_end);
 	/* Delete entries from start of list until object fits */
-	while (free_space < total_len && log->ptr_first != log->ptr_last) {
+	while (free_space < total_len /* && log->ptr_first != log->ptr_last */) {
 		drop_first_entry(log);
-		free_space = objectlog_free_space(log, log_end);
+		free_space = objectlog_free_space(log, &log_end);
 	}
 
 	/* Store start of object header */
@@ -205,7 +182,8 @@ uint16_t objectlog_write_scattered_object(objectlog_t *log, const scatter_object
 
 uint16_t objectlog_write_object(objectlog_t *log, const void *data, uint16_t len) {
 	scatter_object_t scatter_list[] = {
-		{ .ptr = data, .len = len },
+		/* Cast to non-const for compatibility, still never written */
+		{ .ptr = (void *)data, .len = len },
 		{ .len = 0 }
 	};
 
@@ -263,7 +241,7 @@ const void *objectlog_get_fragment(objectlog_t *log,
 	log->multiring.ptr_read = *iterator;
 
 	*len = FRAGMENT_LEN(multiring_read_one(&log->multiring));
-	return ((uint8_t*)log->multiring.ptr_read.storage) +
+	return ((uint8_t*)log->multiring.ptr_read.storage->ptr) +
 		log->multiring.ptr_read.offset;
 }
 

@@ -16,7 +16,7 @@ typedef struct {
 typedef multiring_ptr_t objectlog_iterator_t;
 
 int objectlog_init(objectlog_t *log, void *storage, uint16_t size);
-int objectlog_init_fragmented(objectlog_t *log, scatter_object_t *storage);
+int objectlog_init_fragmented(objectlog_t *log, const scatter_object_t *storage);
 uint16_t objectlog_write_object(objectlog_t *log, const void *data, uint16_t len);
 uint16_t objectlog_write_scattered_object(objectlog_t *log, const scatter_object_t *scatter_list);
 uint16_t objectlog_write_string(objectlog_t *log, const char *str);
