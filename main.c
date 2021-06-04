@@ -58,7 +58,7 @@ static int check_integrity(objectlog_t *log) {
 	size_t steps = 0;
 
 	if (log->num_entries < 2) {
-		return 0;
+		return 1;
 	}
 
 	log->multiring.ptr_read = first_string;
