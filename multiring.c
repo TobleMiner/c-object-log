@@ -29,7 +29,7 @@ int multiring_init(multiring_t *multiring, const scatter_object_t *storage) {
 	storage_list_size = (num_storage_area + 1) * sizeof(scatter_object_t);
 	storage_list_offset = ALIGN_UP(storage_list_size, 8);
 
-	if (storage[sc_max_entry_idx].len < storage_list_size) {
+	if (storage[sc_max_entry_idx].len < storage_list_offset) {
 		return -1;
 	}
 
