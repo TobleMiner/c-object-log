@@ -7,7 +7,7 @@
 
 #include "objectlog.h"
 
-uint8_t logbuf[1235];
+uint8_t logbuf[16384];
 
 #define ARRAY_SIZE(arr) (sizeof(arr)/sizeof(*arr))
 
@@ -68,10 +68,12 @@ static int check_integrity(objectlog_t *log) {
 		uint8_t len = hdr & 0x7f;
 
 		multiring_read(&log->multiring, tmpstr, len);
+/*
 		printf("%.*s", len, tmpstr);
 		if (hdr & 0x80) {
 			printf("\n");
 		}
+*/
 //		multiring_advance_read(&log->multiring, len);
 	}
 
@@ -79,15 +81,44 @@ static int check_integrity(objectlog_t *log) {
 	return steps <= log->num_entries * (log->multiring.size / 128) + log->multiring.num_storage;
 }
 
+static int objectlog_setup(objectlog_t *log) {
+	int j;
+	scatter_object_t scatter_list[20];
+	size_t len = sizeof(logbuf), offset = 0;
+	size_t avail;
+
+	for (j = 0; j < ARRAY_SIZE(scatter_list) - 2 && offset < len; j++) {
+		size_t left = len - offset;
+		size_t entry_len = rand() % left + 1;
+		scatter_list[j].ptr = logbuf + offset;
+		scatter_list[j].len = entry_len;
+		printf("Scatter %d, len %zu\n", j, entry_len);
+		offset += entry_len;
+	}
+	scatter_list[j].ptr = logbuf + offset;
+	scatter_list[j].len = len - offset;
+	if (scatter_list[j].len) {
+		printf("Scatter %d, len %zu\n", j, scatter_list[j].len);
+	}
+	scatter_list[j + 1].len = 0;
+
+	printf("Object log initialized with %d fragments\n", j);
+
+	return objectlog_init_fragmented(log, scatter_list);
+}
+
 int test_objectlog() {
 	objectlog_t log;
 
-	objectlog_init(&log, logbuf, sizeof(logbuf));
+	if (objectlog_setup(&log)) {
+		printf("Logbuf init failed\n");
+		exit(1);
+	}
 	objectlog_write_string(&log, "Hello World!");
 	objectlog_write_string(&log, "This is a longer test string");
 	objectlog_write_string(&log, "This is a very long test string. It is in fact so long that it won't fit within a single fragment. So how was your day? Mine was great! I got to play around with mind-numbing amounts of pointers on string fragments");
 
-	for (int i = 0; i < 100; i++) {
+	for (int i = 0; i < 10000; i++) {
 		int j;
 		size_t len, offset = 0;
 		char strbuf[300];
@@ -107,8 +138,20 @@ int test_objectlog() {
 		scatter_list[j].ptr = strbuf + offset;
 		scatter_list[j].len = len - offset;
 		scatter_list[j + 1].len = 0;
+		printf("Run %d\n", i);
+/*
+		printf("=========PRE=========\n");
+		for (unsigned int i = 0; i < log.num_entries; i++) {
+			show_string(&log, i);
+		}
+*/
 		objectlog_write_scattered_object(&log, scatter_list);
-
+/*
+		printf("=========POST=========\n");
+		for (unsigned int i = 0; i < log.num_entries; i++) {
+			show_string(&log, i);
+		}
+*/
 		if(!check_integrity(&log)) {
 			printf("Integrity compromised after adding string %d\n", i);
 			assert(false);
@@ -185,15 +228,14 @@ int test_multiring() {
 
 int main() {
 	unsigned long seed = time(NULL);
-	seed = 1622589983;
+//	seed = 1622589983;
 	printf("Seed: %lu\n", seed);
 	srand(seed);
-/*
+
 	for (int i = 0; i < 100; i++) {
 		test_multiring();
+		test_objectlog();
 	}
-*/
 //	return 0;
-	test_objectlog();
 	return 0;
 }
