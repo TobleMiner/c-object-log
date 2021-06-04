@@ -62,6 +62,7 @@ int objectlog_init_fragmented(objectlog_t *log, const scatter_object_t *storage)
 	if (err) {
 		return err;
 	}
+	/* Fill ring with zero-length fagments */
 	multiring_memset(&log->multiring, FRAGMENT_FINAL, log->multiring.size);
 
 	log->ptr_first = log->multiring.ptr_read;
