@@ -13,6 +13,12 @@ int multiring_init(multiring_t *multiring, const scatter_object_t *storage) {
 	uint16_t storage_size = 0;
 	uint16_t storage_list_offset;
 
+	/*
+	 * Determine three parameters:
+	 *  - largest scatter list entry
+	 *  - accumulated size of all scatter list enties
+	 *  - number of scatter list entries
+	 */
 	while (sc_entry->len) {
 		if (sc_entry->len > storage[sc_max_entry_idx].len) {
 			sc_max_entry_idx = num_storage_area;
@@ -21,6 +27,7 @@ int multiring_init(multiring_t *multiring, const scatter_object_t *storage) {
 		num_storage_area++;
 		sc_entry++;
 	}
+	/* Fail if there are no scatter list enties */
 	if (!num_storage_area) {
 		return -1;
 	}
@@ -29,20 +36,23 @@ int multiring_init(multiring_t *multiring, const scatter_object_t *storage) {
 	storage_list_size = (num_storage_area + 1) * sizeof(scatter_object_t);
 	storage_list_offset = ALIGN_UP(storage_list_size, 8);
 
-	/* Ensure largest scatterlist entry can store a copy of the scatterlist */
+	/* Ensure largest scatterlist entry can store a copy of the scatter list */
 	if (storage[sc_max_entry_idx].len <= storage_list_offset) {
 		return -1;
 	}
 
+	/* Create copy of the scatter list */
 	sc_list_copy = storage[sc_max_entry_idx].ptr;
 	memcpy(sc_list_copy, storage, storage_list_size);
 	sc_list_copy[sc_max_entry_idx].ptr =
 		((uint8_t*)sc_list_copy[sc_max_entry_idx].ptr) + storage_list_offset;
 	sc_list_copy[sc_max_entry_idx].len -= storage_list_offset;
 	storage_size -= storage_list_offset;
+	/* Point storeage to scatter list copy */
 	multiring->storage = sc_list_copy;
 	multiring->size = storage_size;
 
+	/* Set pointers to start of storage */
 	multiring->ptr_read.storage = sc_list_copy;
 	multiring->ptr_read.offset = 0;
 	multiring->ptr_write.storage = sc_list_copy;
