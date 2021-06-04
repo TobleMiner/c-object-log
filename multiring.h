@@ -56,3 +56,8 @@ static inline uint16_t multiring_available(multiring_t *multiring) {
 	return multiring_byte_delta(multiring, &multiring->ptr_read,
 				     &multiring->ptr_write);
 }
+
+static inline int multiring_ptr_cmp(multiring_ptr_t *a, multiring_ptr_t *b) {
+	return a->storage != b->storage ||
+	       a->offset != b->offset;
+}
