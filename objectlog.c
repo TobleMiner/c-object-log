@@ -22,7 +22,7 @@ static void get_next_entry(objectlog_t *log, multiring_ptr_t *offset) {
 		 * whether we have wrapped across @offset and terminate if
 		 * we did
 		 */
-	} while (!(fragment_hdr & FRAGMENT_FINAL) && FRAGMENT_LEN(fragment_hdr));
+	} while (!(fragment_hdr & FRAGMENT_FINAL));
 
 	*offset = log->multiring.ptr_read;
 }
@@ -62,7 +62,7 @@ int objectlog_init_fragmented(objectlog_t *log, const scatter_object_t *storage)
 	if (err) {
 		return err;
 	}
-	multiring_memset(&log->multiring, 0, log->multiring.size);
+	multiring_memset(&log->multiring, FRAGMENT_FINAL, log->multiring.size);
 
 	log->ptr_first = log->multiring.ptr_read;
 	log->ptr_last = log->multiring.ptr_read;
