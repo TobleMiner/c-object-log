@@ -2,6 +2,8 @@
 
 #include "multiring.h"
 
+#define ALIGN_UP(x, align) ((x) + (x) % (align))
+
 int multiring_init(multiring_t *multiring, const scatter_object_t *storage) {
 	const scatter_object_t *sc_entry = storage;
 	unsigned int sc_max_entry_idx = 0;
@@ -9,6 +11,7 @@ int multiring_init(multiring_t *multiring, const scatter_object_t *storage) {
 	unsigned int num_storage_area = 0;
 	uint16_t storage_list_size;
 	uint16_t storage_size = 0;
+	uint16_t storage_list_offset;
 
 	while (sc_entry->len) {
 		if (sc_entry->len > storage[sc_max_entry_idx].len) {
@@ -24,6 +27,7 @@ int multiring_init(multiring_t *multiring, const scatter_object_t *storage) {
 
 	multiring->num_storage = num_storage_area;
 	storage_list_size = (num_storage_area + 1) * sizeof(scatter_object_t);
+	storage_list_offset = ALIGN_UP(storage_list_size, 8);
 
 	if (storage[sc_max_entry_idx].len < storage_list_size) {
 		return -1;
@@ -32,9 +36,9 @@ int multiring_init(multiring_t *multiring, const scatter_object_t *storage) {
 	sc_list_copy = storage[sc_max_entry_idx].ptr;
 	memcpy(sc_list_copy, storage, storage_list_size);
 	sc_list_copy[sc_max_entry_idx].ptr =
-		((uint8_t*)sc_list_copy[sc_max_entry_idx].ptr) + storage_list_size;
-	sc_list_copy[sc_max_entry_idx].len -= storage_list_size;
-	storage_size -= storage_list_size;
+		((uint8_t*)sc_list_copy[sc_max_entry_idx].ptr) + storage_list_offset;
+	sc_list_copy[sc_max_entry_idx].len -= storage_list_offset;
+	storage_size -= storage_list_offset;
 	multiring->storage = sc_list_copy;
 	multiring->size = storage_size;
 
