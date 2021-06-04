@@ -120,7 +120,23 @@ uint16_t objectlog_write_scattered_object(objectlog_t *log, const scatter_object
 	get_next_entry(log, &log_end);
 	free_space = objectlog_free_space(log, &log_end);
 	/* Delete entries from start of list until object fits */
-	while (free_space < total_len /* && log->ptr_first != log->ptr_last */) {
+	while (free_space < total_len) {
+		/*
+		 * Special case:
+		 * Once there is only a single object left we need to delete
+		 * it to be able to store the new object
+		 */
+		if (!multiring_ptr_cmp(&log->ptr_first, &log->ptr_last)) {
+			multiring_ptr_t init_ptr;
+
+			init_ptr.storage = log->multiring.storage;
+			init_ptr.offset = 0;
+			log->ptr_first = init_ptr;
+			log->ptr_last = init_ptr;
+			log->multiring.ptr_write = init_ptr;
+			log->num_entries = 0;
+			break;
+		}
 		drop_first_entry(log);
 		free_space = objectlog_free_space(log, &log_end);
 	}
