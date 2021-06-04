@@ -47,9 +47,7 @@ static void show_string(objectlog_t *log, unsigned int idx) {
 	}
 }
 
-static bool multiring_ptr_equal(multiring_ptr_t *a, multiring_ptr_t *b) {
-	return a->storage == b->storage && a->offset == b->offset;
-}
+#define DIV_ROUND_UP(a, b) (((a) + ((b) - 1)) / b)
 
 static int check_integrity(objectlog_t *log) {
 	multiring_ptr_t first_string = log->ptr_first;
@@ -62,7 +60,7 @@ static int check_integrity(objectlog_t *log) {
 	}
 
 	log->multiring.ptr_read = first_string;
-	while (!multiring_ptr_equal(&last_string, &log->multiring.ptr_read) && steps++ < max_steps) {
+	while (multiring_ptr_cmp(&last_string, &log->multiring.ptr_read) && steps++ < max_steps) {
 		char tmpstr[128] = { 0 };
 		uint8_t hdr = multiring_read_one(&log->multiring);
 		uint8_t len = hdr & 0x7f;
@@ -74,11 +72,10 @@ static int check_integrity(objectlog_t *log) {
 			printf("\n");
 		}
 */
-//		multiring_advance_read(&log->multiring, len);
 	}
 
 	printf("\nIntegrity verified in %zu steps for %u entries over %u fragments\n", steps, log->num_entries, log->multiring.num_storage);
-	return steps <= log->num_entries * (log->multiring.size / 128) + log->multiring.num_storage;
+	return steps <= log->num_entries * DIV_ROUND_UP(log->multiring.size, 128) + log->multiring.num_storage;
 }
 
 static int objectlog_setup(objectlog_t *log) {
