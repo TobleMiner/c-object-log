@@ -2,7 +2,7 @@
 
 #include "multiring.h"
 
-#define ALIGN_UP(x, align) ((x) + (x) % (align))
+#define ALIGN_UP(x, align) ((x) + ((align) - (x) % (align)))
 
 int multiring_init(multiring_t *multiring, const scatter_object_t *storage) {
 	const scatter_object_t *sc_entry = storage;
