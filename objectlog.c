@@ -27,7 +27,7 @@ static void get_next_entry(objectlog_t *log, multiring_ptr_t *offset) {
 	*offset = log->multiring.ptr_read;
 }
 
-static uint16_t objectlog_space_between(objectlog_t *log,
+static scatter_size_t objectlog_space_between(objectlog_t *log,
 					multiring_ptr_t *first,
 					multiring_ptr_t *second) {
 	return multiring_byte_delta(&log->multiring, first, second);
@@ -38,11 +38,11 @@ static void drop_first_entry(objectlog_t *log) {
 	log->num_entries--;
 }
 
-static uint16_t objectlog_free_space(objectlog_t *log, multiring_ptr_t *from) {
+static scatter_size_t objectlog_free_space(objectlog_t *log, multiring_ptr_t *from) {
 	return objectlog_space_between(log, from, &log->ptr_first);
 }
 
-static void objectlog_write_fragment_hdr(objectlog_t *log, uint16_t len, bool final) {
+static void objectlog_write_fragment_hdr(objectlog_t *log, scatter_size_t len, bool final) {
 	uint8_t hdr = FRAGMENT_LEN(len);
 
 	if (final) {
@@ -51,7 +51,7 @@ static void objectlog_write_fragment_hdr(objectlog_t *log, uint16_t len, bool fi
 	multiring_write_one(&log->multiring, hdr);
 }
 
-static void objectlog_write_fragment_data(objectlog_t *log, const void *data, uint16_t len) {
+static void objectlog_write_fragment_data(objectlog_t *log, const void *data, scatter_size_t len) {
 	multiring_write(&log->multiring, data, len);
 }
 
@@ -71,7 +71,7 @@ int objectlog_init_fragmented(objectlog_t *log, const scatter_object_t *storage)
 	return 0;
 }
 
-int objectlog_init(objectlog_t *log, void *storage, uint16_t size) {
+int objectlog_init(objectlog_t *log, void *storage, scatter_size_t size) {
 	scatter_object_t scatter_storage[] = {
 		{ .ptr = storage, .len = size },
 		{ .len = 0 },
@@ -89,19 +89,19 @@ int objectlog_init(objectlog_t *log, void *storage, uint16_t size) {
  *
  * @returns: 0 on success, number of bytes missing for storage on failure
  */
-uint16_t objectlog_write_scattered_object(objectlog_t *log, const scatter_object_t *scatter_list)
+scatter_size_t objectlog_write_scattered_object(objectlog_t *log, const scatter_object_t *scatter_list)
 {
 	const scatter_object_t *sc_list = scatter_list;
 	const uint8_t *data8;
-	uint16_t num_fragments;
-	uint16_t data_len = 0;
-	uint16_t total_len;
+	scatter_size_t num_fragments;
+	scatter_size_t data_len = 0;
+	scatter_size_t total_len;
 	multiring_ptr_t new_last;
-	uint16_t free_space;
+	scatter_size_t free_space;
 	multiring_ptr_t log_end = log->ptr_last;
-	uint16_t scatter_entry_offset = 0;
-	uint16_t fragment_offset = 0;
-	uint16_t fragment_len;
+	scatter_size_t scatter_entry_offset = 0;
+	scatter_size_t fragment_offset = 0;
+	scatter_size_t fragment_len;
 
 	/* Calculate total length of all data in @scatter_list */
 	data_len = scatter_list_size(sc_list);
@@ -148,7 +148,7 @@ uint16_t objectlog_write_scattered_object(objectlog_t *log, const scatter_object
 	sc_list = scatter_list;
 	data8 = sc_list->ptr;
 	while(sc_list->len) {
-		uint16_t write_len = data_len;
+		scatter_size_t write_len = data_len;
 
 		/* Calculate maximum permissible size for this fragment */
 		if (!fragment_offset) {
@@ -197,7 +197,7 @@ uint16_t objectlog_write_scattered_object(objectlog_t *log, const scatter_object
 	return 0;
 }
 
-uint16_t objectlog_write_object(objectlog_t *log, const void *data, uint16_t len) {
+scatter_size_t objectlog_write_object(objectlog_t *log, const void *data, scatter_size_t len) {
 	scatter_object_t scatter_list[] = {
 		/* Cast to non-const for compatibility, still never written */
 		{ .ptr = (void *)data, .len = len },
@@ -207,7 +207,7 @@ uint16_t objectlog_write_object(objectlog_t *log, const void *data, uint16_t len
 	return objectlog_write_scattered_object(log, scatter_list);
 }
 
-uint16_t objectlog_write_string(objectlog_t *log, const char *str) {
+scatter_size_t objectlog_write_string(objectlog_t *log, const char *str) {
 	return objectlog_write_object(log, str, strlen(str));
 }
 
@@ -267,7 +267,7 @@ const void *objectlog_get_fragment(objectlog_t *log,
  *
  */
 void objectlog_next(objectlog_t *log, objectlog_iterator_t *iterator) {
-	uint16_t len;
+	scatter_size_t len;
 	uint8_t hdr;
 
 	if (objectlog_iterator_is_err(iterator)) {
@@ -292,9 +292,9 @@ void objectlog_next(objectlog_t *log, objectlog_iterator_t *iterator) {
  * @returns: -1 on failure, else
  *	     non-negative length of object
  */
-long objectlog_get_object_size(objectlog_t *log, int object_idx) {
+objectlog_ssize_t objectlog_get_object_size(objectlog_t *log, int object_idx) {
 	objectlog_iterator_t iter;
-	uint16_t len = 0;
+	scatter_size_t len = 0;
 
 	objectlog_iterator(log, object_idx, &iter);
 	if (objectlog_iterator_is_err(&iter)) {

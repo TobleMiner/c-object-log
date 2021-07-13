@@ -9,9 +9,9 @@ int multiring_init(multiring_t *multiring, const scatter_object_t *storage) {
 	unsigned int sc_max_entry_idx = 0;
 	scatter_object_t *sc_list_copy;
 	unsigned int num_storage_area = 0;
-	uint16_t storage_list_size;
-	uint16_t storage_size = 0;
-	uint16_t storage_list_offset;
+	scatter_size_t storage_list_size;
+	scatter_size_t storage_size = 0;
+	scatter_size_t storage_list_offset;
 
 	/*
 	 * Determine three parameters:
@@ -72,11 +72,11 @@ void multiring_next_ring(multiring_t *multiring, multiring_ptr_t *ptr) {
 }
 
 void multiring_advance(multiring_t *multiring, multiring_ptr_t *ptr,
-		       uint16_t count) {
+		       scatter_size_t count) {
 	multiring_ptr_t ring_ptr = *ptr;
 
 	while (count) {
-		uint16_t space_ring =
+		scatter_size_t space_ring =
 			multiring_available_contiguous(&ring_ptr);
 
 		if (space_ring > count) {
@@ -90,12 +90,12 @@ void multiring_advance(multiring_t *multiring, multiring_ptr_t *ptr,
 	*ptr = ring_ptr;
 }
 
-void multiring_write(multiring_t *multiring, const void *data, uint16_t len) {
+void multiring_write(multiring_t *multiring, const void *data, scatter_size_t len) {
 	const uint8_t *data8 = data;
 
 	while (len) {
-		uint16_t write_size = len;
-		uint16_t space_avail =
+		scatter_size_t write_size = len;
+		scatter_size_t space_avail =
 			multiring_available_contiguous(&multiring->ptr_write);
 
 		if (write_size > space_avail) {
@@ -111,12 +111,12 @@ void multiring_write(multiring_t *multiring, const void *data, uint16_t len) {
 	}
 }
 
-void multiring_read(multiring_t *multiring, void *data, uint16_t len) {
+void multiring_read(multiring_t *multiring, void *data, scatter_size_t len) {
 	uint8_t *data8 = data;
 
 	while (len) {
-		uint16_t read_size = len;
-		uint16_t space_avail =
+		scatter_size_t read_size = len;
+		scatter_size_t space_avail =
 			multiring_available_contiguous(&multiring->ptr_read);
 
 		if (read_size > space_avail) {
@@ -133,13 +133,13 @@ void multiring_read(multiring_t *multiring, void *data, uint16_t len) {
 	}
 }
 
-uint16_t multiring_num_wraps(multiring_t *multiring, uint16_t len) {
-	uint16_t num_wraps = 0;
+scatter_size_t multiring_num_wraps(multiring_t *multiring, scatter_size_t len) {
+	scatter_size_t num_wraps = 0;
 	multiring_ptr_t ptr = multiring->ptr_write;
 
 	while (len) {
-		uint16_t chunk_size = len;
-		uint16_t space_avail = multiring_available_contiguous(&ptr);
+		scatter_size_t chunk_size = len;
+		scatter_size_t space_avail = multiring_available_contiguous(&ptr);
 
 		if (chunk_size > space_avail) {
 			chunk_size = space_avail;
@@ -156,10 +156,10 @@ uint16_t multiring_num_wraps(multiring_t *multiring, uint16_t len) {
 	return num_wraps;
 }
 
-void multiring_memset(multiring_t *multiring, uint8_t val, uint16_t len) {
+void multiring_memset(multiring_t *multiring, uint8_t val, scatter_size_t len) {
 	while (len) {
-		uint16_t write_size = len;
-		uint16_t space_avail =
+		scatter_size_t write_size = len;
+		scatter_size_t space_avail =
 			multiring_available_contiguous(&multiring->ptr_write);
 
 		if (write_size > space_avail) {
@@ -174,10 +174,10 @@ void multiring_memset(multiring_t *multiring, uint8_t val, uint16_t len) {
 	}
 }
 
-uint16_t multiring_byte_delta(multiring_t *multiring,
+scatter_size_t multiring_byte_delta(multiring_t *multiring,
 			      multiring_ptr_t *first,
 			      multiring_ptr_t *second) {
-	uint16_t len;
+	scatter_size_t len;
 	multiring_ptr_t ptr = *first;
 
 	/* Simple cases: first and second are from the same scatter list entry */
